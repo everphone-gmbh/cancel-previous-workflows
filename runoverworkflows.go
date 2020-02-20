@@ -53,7 +53,7 @@ func cancelWorkflow(id int64) {
 	if err != nil {
 		log.Println(err)
 	}
-	if response.StatusCode != 202 {
+	if response.StatusCode != http.StatusAccepted {
 		body, _ := ioutil.ReadAll(response.Body)
 		log.Println(errors.New(fmt.Sprintf("failed to cancel workflow #%d, status code: %d, body: %s", id, response.StatusCode, body)))
 	}

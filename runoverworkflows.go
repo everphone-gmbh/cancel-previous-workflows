@@ -42,25 +42,21 @@ func githubRequest(request *http.Request) (*http.Response, error) {
 	return response, nil
 }
 
-// best effort
-func cancelWorkflow(id int64) {
-	defer wg.Done()
+func cancelWorkflow(id int64) error {
 	request, err := http.NewRequest("POST", fmt.Sprintf(
 		"https://api.github.com/repos/%s/actions/runs/%d/cancel", githubRepo, id), nil)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	response, err := githubRequest(request)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	if response.StatusCode != http.StatusAccepted {
 		body, _ := ioutil.ReadAll(response.Body)
-		log.Println(errors.New(fmt.Sprintf("failed to cancel workflow #%d, status code: %d, body: %s", id, response.StatusCode, body)))
-		return
+		return errors.New(fmt.Sprintf("failed to cancel workflow #%d, status code: %d, body: %s", id, response.StatusCode, body))
 	}
+	return nil
 }
 
 // I don't wan't to fail the current workflow if I fail canceling previous workflow's => so I only log errors
@@ -105,8 +101,12 @@ func main() {
 		}
 		log.Printf("canceling run https://github.com/%s/actions/runs/%d\n", githubRepo, run.Id)
 		wg.Add(1)
-		go cancelWorkflow(run.Id)
+		go func() {
+			defer wg.Done()
+			if err := cancelWorkflow(run.Id); err != nil {
+				log.Println(err)
+			}
+		}()
 	}
 	wg.Wait()
-
 }

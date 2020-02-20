@@ -101,12 +101,12 @@ func main() {
 		}
 		log.Printf("canceling run https://github.com/%s/actions/runs/%d\n", githubRepo, run.Id)
 		wg.Add(1)
-		go func() {
+		go func(id int64) {
 			defer wg.Done()
-			if err := cancelWorkflow(run.Id); err != nil {
+			if err := cancelWorkflow(id); err != nil {
 				log.Println(err)
 			}
-		}()
+		}(run.Id)
 	}
 	wg.Wait()
 }

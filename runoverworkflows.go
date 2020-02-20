@@ -44,22 +44,26 @@ func githubRequest(request *http.Request) (*http.Response, error) {
 
 // best effort
 func cancelWorkflow(id int64) {
+	defer wg.Done()
 	request, err := http.NewRequest("POST", fmt.Sprintf(
 		"https://api.github.com/repos/%s/actions/runs/%d/cancel", githubRepo, id), nil)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 	response, err := githubRequest(request)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 	if response.StatusCode != http.StatusAccepted {
 		body, _ := ioutil.ReadAll(response.Body)
 		log.Println(errors.New(fmt.Sprintf("failed to cancel workflow #%d, status code: %d, body: %s", id, response.StatusCode, body)))
+		return
 	}
-	wg.Done()
 }
 
+// I don't wan't to fail the current workflow if I fail canceling previous workflow's => so I only log errors
 func main() {
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -68,22 +72,26 @@ func main() {
 	log.Printf("listing runs for branch %s in repo %s\n", branchName, githubRepo)
 	request, err := http.NewRequest("GET", fmt.Sprintf("https://api.github.com/repos/%s/actions/runs", githubRepo), nil)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	query := request.URL.Query()
 	query.Set("branch", branchName)
 	request.URL.RawQuery = query.Encode()
 	response, err := githubRequest(request)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	var workflows WorkflowRunsResponse
 	if err = json.Unmarshal(body, &workflows); err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	for _, run := range workflows.WorkflowRuns {
 		if run.Status == "completed" {

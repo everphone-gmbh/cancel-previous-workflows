@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ type WorkflowRun struct {
 	Status     string `json:"status"`
 	HeadSha    string `json:"head_sha"`
 	HeadBranch string `json:"head_branch"`
+	RunNumber  int    `json:"run_number"`
 }
 
 type WorkflowRunsResponse struct {
@@ -30,6 +32,7 @@ var githubRepo = os.Getenv("GITHUB_REPOSITORY")
 var githubToken = os.Getenv("GITHUB_TOKEN")
 var branchName = strings.Replace(os.Getenv("GITHUB_REF"), "refs/heads/", "", 1)
 var currentSha = os.Getenv("GITHUB_SHA")
+var currentRunNumber, _ = strconv.Atoi(os.Getenv("GITHUB_RUN_NUMBER"))
 var wg = sync.WaitGroup{}
 
 func githubRequest(request *http.Request) (*http.Response, error) {
@@ -98,6 +101,9 @@ func main() {
 		}
 		if run.HeadSha == currentSha {
 			continue // not canceling my own jobs
+		}
+		if currentRunNumber != 0 && run.RunNumber > currentRunNumber {
+			continue // only canceling previous executions, not newer ones
 		}
 		log.Printf("canceling run https://github.com/%s/actions/runs/%d\n", githubRepo, run.Id)
 		wg.Add(1)
